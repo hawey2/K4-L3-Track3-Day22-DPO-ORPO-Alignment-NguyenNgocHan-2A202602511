@@ -1,12 +1,11 @@
 # Bài phản tư — Lab 22 (căn chỉnh mô hình bằng DPO/ORPO)
 
-**Tên:** _<Họ Tên>_
-**Khoá:** _<A20-K4 / ...>_
-**Tier đã chạy:** _<T4 | BIGGPU | cả hai>_
-**Ngày:** _<YYYY-MM-DD>_
+**Tên:** _NGUYEN NGOC HAN_
+**Khoá:** _A20-K4 / 2A202602511_
+**Tier đã chạy:** _T4_
+**Ngày:** _2026-10-08_
 
-> Mọi con số dưới đây lấy từ file do notebook sinh ra (`adapters/dpo/dpo_metrics.json`,
-> `data/eval/judge_summary.json`, `data/eval/benchmark_results.json`…), không ước lượng bằng mắt.
+> Số liệu ghi dưới đây được trích từ output notebook `Lab22_DPO_T4.ipynb`. Những mục không có output đi kèm được đánh dấu chưa có, không suy diễn.
 
 ---
 
@@ -14,14 +13,14 @@
 
 | Mục | Giá trị |
 |---|---|
-| GPU / VRAM | _<ví dụ: Colab T4 16 GB>_ |
-| Mô hình gốc | _<ví dụ: unsloth/Qwen3-4B-Instruct-2507-unsloth-bnb-4bit>_ |
-| Dữ liệu SFT | _<saillab/alpaca-vietnamese-cleaned · N mẫu · số epoch>_ |
-| Dữ liệu sở thích | _<sailor2/sea-ultrafeedback-onpolicy (vi) · N huấn luyện / N held-out>_ |
-| Chosen dài hơn rejected (NB2) | _<ví dụ: 65%>_ |
-| DPO: β / tốc độ học (lr) / số epoch | _<0.1 / 5e-6 / 1>_ |
-| Giám khảo | _<rm:tên-mô-hình hoặc nhà-cung-cấp:tên-mô-hình; sanity accuracy>_ |
-| Chi phí | _<0 đồng (Colab miễn phí) / ...>_ |
+| GPU / VRAM | Colab Tesla T4; runtime cho biết 14.563 GB tổng khả dụng, không ghi VRAM đỉnh tiến trình |
+| Mô hình gốc | `unsloth/Qwen3-4B-Instruct-2507-unsloth-bnb-4bit` |
+| Dữ liệu SFT | `saillab/alpaca-vietnamese-cleaned` · 1,000 mẫu · 1 epoch |
+| Dữ liệu sở thích | `sailor2/sea-ultrafeedback-onpolicy` (Vietnamese) · 800 train / 100 held-out |
+| Chosen dài hơn rejected (NB2) | 65.9%; median 94 so với 86 token |
+| DPO: β / tốc độ học (lr) / số epoch | 0.1 / 5e-6 / 1 |
+| Giám khảo | Không có kết quả NB4 trong output đã lưu. Notebook cấu hình mặc định panel Skywork Reward V2 Qwen3-4B + Llama-3.2-3B |
+| Chi phí | Colab Free |
 
 ---
 
@@ -29,13 +28,13 @@
 
 | Chỉ số | Giá trị |
 |---|---:|
-| Thời gian huấn luyện NB3 | _<...>_ |
-| VRAM cao nhất | _<...>_ |
-| Reward gap cuối trên tập huấn luyện (chosen − rejected) | _<...>_ |
-| Độ chính xác reward trên held-out | _<...>_ |
-| Margin trên held-out | _<...>_ |
-| Chẩn đoán tự động (`diagnosis`) | _<INTENDED / LIKELIHOOD DISPLACEMENT / FAILURE / AMBIGUOUS>_ |
-| Độ dài trung bình câu trả lời SFT → DPO (NB4) | _<... → ... ký tự>_ |
+| Thời gian huấn luyện NB3 | Không được ghi trong output đã lưu |
+| VRAM cao nhất | Không có số đỉnh sử dụng; runtime báo T4 với 14.563 GB tổng khả dụng |
+| Reward gap cuối trên tập huấn luyện (chosen − rejected) | 0.0957 (chosen 0.3814 − rejected 0.2857) |
+| Độ chính xác reward trên held-out | 0.700 |
+| Margin trên held-out | 0.0824 (chosen 0.3933 − rejected 0.3109) |
+| Chẩn đoán tự động (`diagnosis`) | INTENDED |
+| Độ dài trung bình câu trả lời SFT → DPO (NB4) | Không có output NB4 được lưu |
 
 ---
 
@@ -43,12 +42,7 @@
 
 > Ảnh: `screenshots/03-dpo-reward-curves.png`
 
-_Mô tả riêng `rewards/chosen` và `rewards/rejected` trên **train và held-out**. Chosen tăng hay giảm?
-Margin tăng vì chosen tăng hay vì rejected giảm nhanh hơn (dịch chuyển xác suất, likelihood displacement)? Held-out có đi
-cùng hướng với tập huấn luyện không, hay chỉ tập huấn luyện tăng (học thuộc, overfit)? Chẩn đoán tự động có khớp với điều bạn
-thấy không?_
-
-_Trả lời ở đây._
+Các reward train bắt đầu gần 0 vì policy khởi đầu trùng với mô hình tham chiếu SFT. Ở cuối quá trình, `rewards/chosen` đạt +0.3814 và `rewards/rejected` +0.2857; gap train là +0.0957. Trên held-out, chosen đạt +0.3933 và rejected đạt +0.3109, cho margin +0.0824 cùng reward accuracy 0.700. Như vậy cả hai reward đều dương và held-out đi cùng xu hướng train; margin không hình thành vì chosen reward giảm trong khi rejected giảm nhanh hơn. Chẩn đoán `INTENDED` phù hợp với các giá trị cuối, không phải `LIKELIHOOD DISPLACEMENT` hay `FAILURE`. Margin held-out thấp hơn train một chút, nhưng các số cuối không cho thấy chỉ train mới học được preference. Ảnh đường cong không có trong snapshot repo, nên nhận xét này dựa trên metrics cuối notebook in ra, không khẳng định hình dạng đường ở từng bước. Accuracy 70% cũng cho thấy tín hiệu preference trên held-out chưa hoàn hảo.
 
 ---
 
@@ -60,18 +54,12 @@ Từ `data/eval/judge_summary.json`:
 
 | Nhóm | n | DPO thắng | SFT thắng | Hoà | Win rate (khoảng tin cậy 95%) | Win rate các cặp dài gần bằng nhau | Câu dài hơn thắng |
 |---|---:|---:|---:|---:|---|---:|---:|
-| held-out | | | | | | | |
-| hữu ích — helpfulness (4) | | | | | | | |
-| an toàn — safety (4) | | | | | | | |
+| held-out | Chưa có kết quả NB4 | — | — | — | — | — | — |
+| hữu ích — helpfulness (4) | Chưa có kết quả NB4 | — | — | — | — | — | — |
+| an toàn — safety (4) | Chưa có kết quả NB4 | — | — | — | — | — | — |
 
-Giám khảo: ______ · sanity accuracy: ______ · `score_length_spearman` (reward model) hoặc độ nhất quán khi đổi chỗ A/B — position consistency (giám khảo API): ______
+Giám khảo/sanity accuracy: không có kết quả NB4 được lưu. Notebook mặc định cấu hình panel Skywork Reward V2 Qwen3-4B và Llama-3.2-3B; chưa xác nhận panel đã chạy.
 
-_Khoảng tin cậy có chứa 0.5 không? Giám khảo có đáng tin trên tiếng Việt không (xem bộ cặp kiểm tra sanity)? DPO thắng vì câu trả lời tốt
-hơn hay vì dài hơn? Hai reward model trong hội đồng (`per_judge`) có cho win rate gần nhau không? Nếu giám khảo Qwen3 cho DPO thắng
-cao hơn hẳn giám khảo Llama, điều đó nói gì về hiện tượng rò rỉ sở thích (preference leakage)?
-Chọn 2 ví dụ cụ thể (1 câu về độ hữu ích, 1 câu về an toàn) và giải thích._
-
-_Trả lời ở đây._
 
 ---
 
@@ -79,23 +67,17 @@ _Trả lời ở đây._
 
 | β | Margin held-out | Độ chính xác held-out | Chẩn đoán | Ghi chú |
 |---:|---:|---:|---|---|
-| 0.05 | | | | |
-| 0.1 | | | | |
-| 0.5 | | | | |
+| 0.05 | — | — | — | Sweep chưa chạy |
+| 0.1 | 0.0824 | 0.700 | INTENDED | Run DPO chuẩn |
+| 0.5 | — | — | — | Sweep chưa chạy |
 
-_Nếu không chạy: viết giả thuyết 3 câu về điều bạn dự đoán sẽ thấy._
+Chưa chạy sweep. Tôi dự đoán β=0.05 sẽ tạo cập nhật nhẹ hơn, có thể giữ sát SFT nhưng margin nhỏ hơn. β=0.5 có thể làm margin tăng nhanh hơn nhưng cũng tăng nguy cơ thay đổi hành vi/độ dài mạnh hoặc giảm chất lượng tổng quát. β=0.1 có khả năng ở giữa hai trường hợp; cần so sánh held-out accuracy và đầu ra sinh chứ không chỉ chọn margin lớn nhất.
 
 ---
 
 ## 6. Một quyết định quan trọng nhất (≥ 150 từ)
 
-> Chọn **một** quyết định (β, tốc độ học, lượng dữ liệu, giám khảo, tier, biến thể loss…):
-> 1. Phương án thay thế là gì?
-> 2. Vì sao chọn phương án này?
-> 3. Kết quả xác nhận hay làm bạn bất ngờ?
-> 4. Làm lại thì bạn đổi gì?
-
-_Trả lời ở đây._
+Quyết định quan trọng nhất của tôi là dùng β=0.1 cho DPO. Phương án khác là β thấp hơn (0.05), tạo cập nhật chính sách nhẹ hơn, hoặc β cao hơn (0.5), tăng áp lực phân biệt chosen và rejected so với reference. Tôi chọn 0.1 làm điểm cân bằng khi huấn luyện một epoch trên 800 cặp với LoRA, thay vì bắt đầu bằng cập nhật quá mạnh. Kết quả cho thấy thiết lập này học được tín hiệu preference: loss giảm từ 0.6935 xuống 0.6756, reward gap train kết thúc ở 0.0957, và held-out margin vẫn dương 0.0824 với reward accuracy 0.70. Cả train và held-out đều có chosen/rejected reward dương, nên margin dương không cần đẩy cả hai log-ratio xuống dưới reference. Tuy vậy, không thể kết luận β=0.1 tốt hơn các giá trị thay thế vì thiếu beta-sweep; cũng chưa chứng minh được chất lượng câu trả lời cho người dùng cải thiện vì thiếu NB4. Nếu làm lại, tôi sẽ chạy sweep với split, seed và lượng huấn luyện cố định; so sánh margin, accuracy held-out và độ dài đầu ra, rồi chọn β không chỉ theo margin cao nhất mà còn theo đánh giá độc lập và kiểm tra độ dài. Như vậy quyết định dựa trên chất lượng tổng thể thay vì tối ưu riêng một chỉ số loss.
 
 ---
 
@@ -105,13 +87,11 @@ _Trả lời ở đây._
 
 | Bộ đo | Giới hạn / môn con | SFT (± stderr) | SFT+DPO (± stderr) | Δ |
 |---|---:|---:|---:|---:|
-| IFEval | | | | |
-| GSM8K | | | | |
-| Global-MMLU-vi | | | | |
+| IFEval | Chưa có kết quả | — | — | — |
+| GSM8K | Chưa có kết quả | — | — | — |
+| Global-MMLU-vi | Chưa có kết quả | — | — | — |
 
-_Δ nào vượt ~2× stderr? Có "thuế căn chỉnh" (alignment tax, tức điểm GSM8K bị giảm sau DPO) không? Kết quả bộ đo có cùng chiều với NB4 không?_
-
-_Trả lời ở đây._
+Không có output NB6 hay `benchmark_results.json`, nên tôi không thể báo điểm SFT/SFT+DPO, stderr hoặc Δ. Vì vậy chưa thể xác định chênh lệch nào vượt khoảng 2×stderr hoặc liệu có alignment tax trên GSM8K hay không. Điểm benchmark có nhiễu lấy mẫu; chênh lệch nhỏ hơn sai số không đủ để kết luận năng lực tăng hoặc giảm. Benchmark cũng đo năng lực khác với reward accuracy của preference dataset, nên không thể thay bằng margin DPO 0.0824 hay accuracy 0.70. Kết quả này chưa được chạy/lưu, không phải điểm 0. Nếu hoàn thành NB6, tôi sẽ ghi giới hạn đánh giá, điểm và stderr của hai model, đồng thời kiểm tra chat template theo rubric. Sau đó sẽ xét Δ theo đúng dấu và độ lớn tương đối với stderr rồi đối chiếu xu hướng NB4. Với bằng chứng hiện có, chưa có cơ sở kết luận alignment tax hoặc cải thiện benchmark.
 
 ---
 
@@ -121,13 +101,13 @@ _Trả lời ở đây._
 
 | Loss | Độ chính xác held-out | Margin held-out | Độ dài trung bình | Nhận xét |
 |---|---:|---:|---:|---|
-| DPO | | | | |
-| RPO | | | | |
-| DPO-norm | | | | |
-| LD-DPO | | | | |
-| ORPO | | | | |
+| DPO | 0.69 | 0.0225 | 442.3 chars | INTENDED |
+| RPO | 0.66 | 0.0362 | 433.5 chars | INTENDED |
+| DPO-norm | 0.64 | 0.0098 | 438.55 chars | LIKELIHOOD DISPLACEMENT |
+| LD-DPO | 0.56 | 0.0263 | 441.95 chars | LIKELIHOOD DISPLACEMENT |
+| ORPO | Không có output lưu | — | — | Chưa xác minh kết quả |
 
-_Biến thể nào thay đổi độ dài nhiều nhất, và vì sao (dựa vào công thức loss)?_
+Trong các biến thể có số liệu, độ dài trung bình nằm trong khoảng 433.5–442.3 ký tự: RPO ngắn nhất và DPO dài nhất. Không có độ dài SFT trên cùng prompt nên không thể tính mức thay đổi thực so với SFT. RPO thêm NLL trên chosen bên cạnh loss DPO để khuyến khích giữ xác suất câu chosen, có thể hạn chế likelihood displacement. DPO-norm chuẩn hoá theo độ dài token và LD-DPO điều chỉnh trọng số token, nhưng hai run vẫn được chẩn đoán likelihood displacement. Do thiếu ORPO và baseline SFT, không thể xác định biến thể thay đổi độ dài nhiều nhất một cách đầy đủ.
 
 ---
 
@@ -135,16 +115,16 @@ _Biến thể nào thay đổi độ dài nhiều nhất, và vì sao (dựa và
 
 | | Giá trị |
 |---|---:|
-| Độ chính xác trước / sau (n câu kiểm tra) | _<... / ... (n=...)>_ |
-| Sai số chuẩn ≈ √(p(1−p)/n) | _<...>_ |
+| Độ chính xác trước / sau (n câu kiểm tra) | Chưa có output GRPO lưu |
+| Sai số chuẩn ≈ √(p(1−p)/n) | Chưa tính được khi thiếu n và p |
 
-_Thành phần reward nào tăng trước (đúng định dạng hay đúng đáp án)? Chênh lệch có vượt nhiễu không?_
+Không có log reward hoặc accuracy trước/sau GRPO trong output đã lưu, nên chưa thể xác định reward định dạng hay reward đáp án tăng trước, hoặc chênh lệch có vượt nhiễu hay không.
 
 ---
 
 ## Danh sách bonus
 
-- [ ] NB3b — biến thể loss (+8)
+- [x] NB3b — biến thể loss (+8; có DPO/RPO/DPO-norm/LD-DPO metrics)
 - [ ] NB5 — GGUF SFT+DPO (+4)
 - [ ] NB6 — benchmark (+6)
 - [ ] NB7 — GRPO (+8)
@@ -157,4 +137,4 @@ _Thành phần reward nào tăng trước (đúng định dạng hay đúng đá
 
 ## Điều bất ngờ nhất
 
-_(Tuỳ chọn, 1–3 câu)_
+Reward margin held-out dương và diagnosis là `INTENDED`, nhưng held-out reward accuracy chỉ đạt 0.70. Điều này nhắc tôi rằng margin tăng không đồng nghĩa mọi cặp preference được xếp đúng, càng không tự động chứng minh người dùng sẽ thích câu trả lời DPO hơn.
